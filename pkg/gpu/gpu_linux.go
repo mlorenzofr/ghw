@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/jaypipes/ghw/pkg/context"
 	"github.com/jaypipes/ghw/pkg/linuxpath"
@@ -24,6 +23,7 @@ const (
 virtual machine or container with no graphics). Therefore,
 GPUInfo.GraphicsCards will be an empty array.
 `
+	_PCI_BASE_CLASS_DISPLAY = "03"
 )
 
 func (i *Info) load() error {
@@ -54,42 +54,24 @@ func (i *Info) load() error {
 	// subsystem (we query the modalias file of the PCI device's sysfs
 	// directory using the `ghw.PCIInfo.GetDevice()` function.
 	paths := linuxpath.New(i.ctx)
-	links, err := os.ReadDir(paths.SysClassDRM)
+	devices, err := os.ReadDir(paths.SysBusPciDevices)
+	cards := make([]*GraphicsCard, 0)
+	cardIdx := 0
+	pci, err := pci.New(context.WithContext(i.ctx))
 	if err != nil {
-		i.ctx.Warn(_WARN_NO_SYS_CLASS_DRM)
 		return nil
 	}
-	cards := make([]*GraphicsCard, 0)
-	for _, link := range links {
-		lname := link.Name()
-		if !strings.HasPrefix(lname, "card") {
-			continue
+	for _, device := range devices {
+		devAddress := device.Name()
+		devBaseClass := pci.GetDeviceClassID(devAddress)
+		if devBaseClass == _PCI_BASE_CLASS_DISPLAY {
+			card := &GraphicsCard{
+				Address: devAddress,
+				Index:   cardIdx,
+			}
+			cards = append(cards, card)
+			cardIdx++
 		}
-		if strings.ContainsRune(lname, '-') {
-			continue
-		}
-		// Grab the card's zero-based integer index
-		lnameBytes := []byte(lname)
-		cardIdx, err := strconv.Atoi(string(lnameBytes[4:]))
-		if err != nil {
-			cardIdx = -1
-		}
-
-		// Calculate the card's PCI address by looking at the symbolic link's
-		// target
-		lpath := filepath.Join(paths.SysClassDRM, lname)
-		dest, err := os.Readlink(lpath)
-		if err != nil {
-			continue
-		}
-		pathParts := strings.Split(dest, "/")
-		numParts := len(pathParts)
-		pciAddress := pathParts[numParts-3]
-		card := &GraphicsCard{
-			Address: pciAddress,
-			Index:   cardIdx,
-		}
-		cards = append(cards, card)
 	}
 	gpuFillNUMANodes(i.ctx, cards)
 	gpuFillPCIDevice(i.ctx, cards)

@@ -118,6 +118,29 @@ type deviceModaliasInfo struct {
 	progIfaceID  string
 }
 
+func getModaliasInfo(info *Info, address string) *deviceModaliasInfo {
+	pciAddr := pciaddr.FromString(address)
+	if pciAddr == nil {
+		info.ctx.Warn("error parsing the pci address %q", address)
+		return nil
+	}
+
+	// no cached data, let's get the information from system.
+	fp := getDeviceModaliasPath(info.ctx, pciAddr)
+	if fp == "" {
+		info.ctx.Warn("error finding modalias info for device %q", address)
+		return nil
+	}
+
+	modaliasInfo := parseModaliasFile(fp)
+	if modaliasInfo == nil {
+		info.ctx.Warn("error parsing modalias info for device %q", address)
+		return nil
+	}
+
+	return modaliasInfo
+}
+
 func parseModaliasFile(fp string) *deviceModaliasInfo {
 	if _, err := os.Stat(fp); err != nil {
 		return nil
@@ -303,26 +326,14 @@ func (info *Info) GetDevice(address string) *Device {
 	if dev := info.lookupDevice(address); dev != nil {
 		return dev
 	}
-
+	
 	pciAddr := pciaddr.FromString(address)
 	if pciAddr == nil {
 		info.ctx.Warn("error parsing the pci address %q", address)
 		return nil
 	}
 
-	// no cached data, let's get the information from system.
-	fp := getDeviceModaliasPath(info.ctx, pciAddr)
-	if fp == "" {
-		info.ctx.Warn("error finding modalias info for device %q", address)
-		return nil
-	}
-
-	modaliasInfo := parseModaliasFile(fp)
-	if modaliasInfo == nil {
-		info.ctx.Warn("error parsing modalias info for device %q", address)
-		return nil
-	}
-
+	modaliasInfo := getModaliasInfo(info, address)
 	device := info.getDeviceFromModaliasInfo(address, modaliasInfo)
 	device.Revision = getDeviceRevision(info.ctx, pciAddr)
 	if info.arch == topology.ARCHITECTURE_NUMA {
@@ -330,6 +341,12 @@ func (info *Info) GetDevice(address string) *Device {
 	}
 	device.Driver = getDeviceDriver(info.ctx, pciAddr)
 	return device
+}
+
+// GetDeviceClassID returns the PCI class value of a device
+func (info *Info) GetDeviceClassID(address string) string {
+	modaliasInfo := getModaliasInfo(info, address)
+	return modaliasInfo.classID
 }
 
 // ParseDevice returns a pointer to a Device given its describing data.
