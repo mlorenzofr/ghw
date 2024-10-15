@@ -977,6 +977,23 @@ Each `ghw.AcceleratorDevice` struct contains the following fields:
   describing the processing accelerator card. This may be `nil` if no PCI device
   information could be determined for the card.
 
+#### filters
+The `ghw.Accelerator()` function accepts, through the `ghw.WithAcceleratorFilters()`
+context modifier, a variadic list of filter functions of type
+`func(dev *pci.Device) bool`. Filters are evaluated in addition to the builtin
+accelerator detection (PCI class matching): a device is only reported if it is
+an accelerator device *and* at least one of the user-provided filters, if any,
+accepts it. Filters are handed an isolated copy of the device, so they cannot
+mutate the devices ghw discovered; the pcidb relation collections (e.g.
+`Vendor.Products`) are stripped from the copy, so filters should match on the
+device's own attributes (IDs and names).
+
+Some filter examples:
+* Select 3D controller cards: `func(dev *ghw.PCIDevice) bool { return dev.Class.ID+dev.Subclass.ID == "0302" }`
+* Select Nvidia (`10de`) 3D controller cards (`0302`): `func(dev *ghw.PCIDevice) bool { return dev.Vendor.ID == "10de" && dev.Class.ID+dev.Subclass.ID == "0302" }`
+* Select Habana Labs (`1da3`) Gaudi3 (`1060`) processing accelerator cards (`1200`): `func(dev *ghw.PCIDevice) bool { return dev.Vendor.ID == "1da3" && dev.Product.ID == "1060" && dev.Class.ID+dev.Subclass.ID == "1200" }`
+* Select AMD ATI hardware: `func(dev *ghw.PCIDevice) bool { return dev.Vendor.ID == "1002" }`
+
 ```go
 package main
 
@@ -987,23 +1004,30 @@ import (
 )
 
 func main() {
-	accel, err := ghw.Accelerator()
+	// example of a filter to detect 3D controllers
+	only3DControllers := func(dev *ghw.PCIDevice) bool {
+		return dev.Class.ID+dev.Subclass.ID == "0302"
+	}
+
+	accel, err := ghw.Accelerator(ghw.WithAcceleratorFilters(only3DControllers))
 	if err != nil {
 		fmt.Printf("Error getting processing accelerator info: %v", err)
+		return
 	}
 
 	fmt.Printf("%v\n", accel)
 
-	for _, card := range accel.Devices {
+	for _, device := range accel.Devices {
 		fmt.Printf(" %v\n", device)
 	}
 }
 ```
 
-Example output from a testing machine:
+Example output from a testing machine (with no filter, so all the accelerator
+devices are reported):
 
 ```
-processing accelerators (1 device)
+accelerators (1 device)
  device @0000:00:04.0 -> driver: 'fake_pci_driver' class: 'Processing accelerators' vendor: 'Red Hat, Inc.' product: 'QEMU PCI Test Device'
 ```
 

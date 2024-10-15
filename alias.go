@@ -34,15 +34,16 @@ var (
 	// DEPRECATED: Please use WithLogger
 	WithAlerter = option.WithAlerter
 	// DEPRECATED: Please use WithDisableWarnings
-	WithNullAlerter     = option.WithNullAlerter
-	WithDisableWarnings = config.WithDisableWarnings
-	WithDisableTools    = config.WithDisableTools
-	WithDisableTopology = config.WithDisableTopology
-	WithPathOverrides   = config.WithPathOverrides
-	WithPCIDB           = config.WithPCIDB
-	WithLogLevel        = config.WithLogLevel
-	WithDebug           = config.WithDebug
-	WithLogger          = config.WithLogger
+	WithNullAlerter        = option.WithNullAlerter
+	WithDisableWarnings    = config.WithDisableWarnings
+	WithDisableTools       = config.WithDisableTools
+	WithDisableTopology    = config.WithDisableTopology
+	WithPathOverrides      = config.WithPathOverrides
+	WithPCIDB              = config.WithPCIDB
+	WithAcceleratorFilters = accelerator.WithFilters
+	WithLogLevel           = config.WithLogLevel
+	WithDebug              = config.WithDebug
+	WithLogger             = config.WithLogger
 )
 
 type Modifier = config.Modifier
@@ -200,6 +201,7 @@ var (
 
 type AcceleratorInfo = accelerator.Info
 type AcceleratorDevice = accelerator.AcceleratorDevice
+type AcceleratorFilter = accelerator.Filter
 
 var (
 	Accelerator = accelerator.New

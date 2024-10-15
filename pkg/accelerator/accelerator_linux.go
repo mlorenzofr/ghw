@@ -7,6 +7,7 @@ package accelerator
 
 import (
 	"context"
+	"slices"
 
 	"github.com/jaypipes/ghw/internal/log"
 	"github.com/jaypipes/ghw/pkg/pci"
@@ -48,16 +49,22 @@ func (i *Info) load(ctx context.Context) error {
 		class := dev.Class.ID
 		subclass := dev.Subclass.ID
 		if subclasses, ok := acceleratorPCIClasses[class]; ok {
-			if slicesContains(subclasses, subclass) {
+			if slices.Contains(subclasses, subclass) {
 				return true
 			}
 		}
 		return false
 	}
 
-	// This loop iterates over the list of PCI devices and filters them based on discovery criteria
+	// This loop iterates over the list of PCI devices and filters them based
+	// on discovery criteria: the builtin accelerator detection plus, if any
+	// were provided, the user-supplied filters.
+	filters := filtersFromContext(ctx)
 	for _, device := range pciInfo.Devices {
 		if !isAccelerator(device) {
+			continue
+		}
+		if !matchFilters(filters, device) {
 			continue
 		}
 		accelDev := &AcceleratorDevice{
@@ -69,14 +76,4 @@ func (i *Info) load(ctx context.Context) error {
 
 	i.Devices = accelDevices
 	return nil
-}
-
-// TODO: delete and just use slices.Contains when the minimal golang version we support is 1.21
-func slicesContains(s []string, v string) bool {
-	for i := range s {
-		if v == s[i] {
-			return true
-		}
-	}
-	return false
 }
