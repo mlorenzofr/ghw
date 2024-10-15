@@ -41,7 +41,7 @@ func testScenario(t *testing.T, filename string, expectedDevs int) {
 		_ = snapshot.Cleanup(tmpRoot)
 	}()
 
-	info, err := accelerator.New(option.WithChroot(tmpRoot))
+	info, err := accelerator.New([]string{}, option.WithChroot(tmpRoot))
 	if err != nil {
 		t.Fatalf("Expected nil err, but got %v", err)
 	}
